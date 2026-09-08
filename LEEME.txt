@@ -1,0 +1,102 @@
+================================================================
+ NInfer 5090 Windows - v1.0.6 (pre-compiled portable build)
+ NInfer 5090 Windows - v1.0.6 (build portable precompilada)
+================================================================
+
+WHAT THIS IS / QUE ES
+  Native Windows 11 build of NInfer (https://github.com/Neroued/ninfer)
+  for NVIDIA GeForce RTX 5090 (sm_120a), synced to upstream v1.0.6
+  (commit a16b6442): DFlash2, NVFP4, FP8 KV, WDDM evictable-budget
+  bypass. Apache License 2.0.
+
+CONTENTS / CONTENIDO
+  ninfer-serve.exe    server binary / binario del servidor
+  *.dll               FFmpeg runtime libraries (vision support)
+  start_5090.bat      generic startup (131k ctx, FP8 KV, MTP3,
+                      --wddm-evictable-budget); tune it to your VRAM
+  download_model.bat  downloads the model (~20 GB)
+  LICENSE-FFMPEG.txt  FFmpeg (GPL v2+) license text for the bundled DLLs
+  LEEME.txt           this file
+
+REQUIREMENTS / REQUISITOS
+  - Windows 11 x64
+  - NVIDIA GeForce RTX 5090 (32 GB VRAM)
+  - NVIDIA driver with CUDA 13.x support
+  - Microsoft Visual C++ Redistributable 2015-2022 (x64)
+  - ~20 GB free disk for the model file
+
+QUICK START
+  1. Extract this ZIP to a folder. / Descomprime el ZIP en una carpeta.
+  2. Double-click download_model.bat
+     (or download manually / o descarga manualmente:
+      https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer/resolve/main/qwen3_8_27b_nvfp4.ninfer)
+  3. Double-click start_5090.bat
+     -> server on http://127.0.0.1:8080 / servidor en
+        OpenAI-compatible: /v1/chat/completions
+        Anthropic-compatible: /v1/messages
+
+WDDM (dedicated GPUs)
+  Keep --wddm-evictable-budget enabled (it is in the shipped bat): it
+  makes the engine budget against TOTAL VRAM instead of the Windows
+  WDDM process budget, so a dedicated GPU can be used to the maximum.
+  Measured with this build on a 32 GB card: 30,565 MiB resident of
+  32,607 MiB (93.7% of the card) with the 27B NVFP4 DFlash2 profile
+  (23.7 GB weights + 228,224-token FP8-KV pool) at C=2. Without the
+  flag that configuration does not start on a 32 GB card.
+
+MEASURED WITH THIS BUILD (RTX 5090, single stream, 2026-09-08,
+--wddm-evictable-budget on every profile)
+  27B nvfp4  FP8 KV MTP3    C=2 131k : prefill 8.75k tok/s (12.8k tok),
+                                      decode 144.9 tok/s (42.4% accept)
+  27B g64    FP8 KV MTP3    C=2 131k : prefill 3.51k tok/s (12.8k tok),
+                                      decode 149.3 tok/s (42.2% accept)
+  27B nvfp4  FP8 KV DFlash2 C=2 200k : prefill 8.06k tok/s (12.8k tok),
+                                      decode 191.3 tok/s (31.7% of 7 tok)
+  27B g64    FP8 KV DFlash2 C=2 131k : prefill 3.50k tok/s (12.8k tok),
+                                      decode 130.2 tok/s (26.1% of 7 tok)
+  Full table (VRAM, KV pool, TTFT, startup) + comparison vs upstream
+  published 5090 numbers and vs the windows-4090 branch: README.md of
+  the windows-5090 branch.
+
+NOTES / NOTAS
+  - start_5090.bat uses MTP3 with the public NVFP4 artifact (Neroued:
+    https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer). The
+    DFlash2 profile (--spec dflash2 --draft-tokens 7) needs the merged
+    companion artifact qwen3_8_27b_nvfp4dflash2.ninfer (the same public
+    NVFP4 weights + DFlash companion, upstream converter pipeline; not
+    yet published in Neroued's public HF repos as of 2026-09-08).
+  - Long-context DFlash2: use --max-context 200000 --kv-capacity auto.
+    With the 23.7 GB NVFP4-dflash2 artifact, --max-context 230000
+    fails at startup (~120 MB short of the engine reservation after the
+    1 GiB automatic headroom); 200k context starts cleanly at 93.7% of
+    the card.
+  - Add --vision to the bat to enable image/video input.
+  - Each person has their own workload: edit the flags in
+    start_5090.bat (context, capacity, concurrency, spec) to taste.
+  - Set CUDA_VISIBLE_DEVICES to your GPU index if you have several
+    GPUs (CUDA enumeration order can differ from nvidia-smi order).
+
+THIRD-PARTY BINARY LICENSES
+  - This package includes binary libraries of the FFmpeg project,
+    licensed under the GNU General Public License v2 or later
+    (BtbN "gpl" shared build). Full license text: LICENSE-FFMPEG.txt
+    in this package. FFmpeg source: https://ffmpeg.org
+  - NVIDIA, CUDA and RTX are trademarks of NVIDIA Corporation.
+
+DISCLAIMER / DESCARGO DE RESPONSABILIDAD
+  This software is provided "as is" (AS IS), without warranty of
+  any kind, express or implied. The author is not liable for
+  hardware damage, system instability, data loss or overheating
+  resulting from the use of these binaries or configurations. You
+  run this software at your own responsibility.
+
+SOURCES / FUENTES
+  https://github.com/Ambolio/ninfer-windows  (branch windows-5090)
+  Model: https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer
+
+CREDITS
+  Neroued (upstream) - UDPSendToFailed (original 4090 fork, WDDM bypass,
+  rk4v4-e8) - sergiuszm (sm_89 kernels) - natpate (Win32 base) -
+  headpiece747 (5090 Windows fork) - Don-Chad (Ampere pioneer) -
+  Qwen Team - unsloth (NVFP4) - z-lab (DFlash2 companion weights).
+  Full legal attribution: NOTICE in the windows-5090 branch.
