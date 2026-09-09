@@ -116,6 +116,15 @@ ninfer_add_test(ninfer_qwen3_6_frontend_test
 target_include_directories(ninfer_qwen3_6_frontend_test PRIVATE
   ${PROJECT_SOURCE_DIR}/src/targets/qwen3_6/export
   ${PROJECT_SOURCE_DIR}/src/targets/qwen3_6/impl)
+ninfer_add_test(ninfer_qwen3_6_incremental_encode_test
+  SOURCES targets/qwen3_6/test_incremental_host_encode.cpp
+  NEEDS_SOURCE_DIR
+  LIBRARIES ninfer_engine ninfer_core)
+target_include_directories(ninfer_qwen3_6_incremental_encode_test PRIVATE
+  ${PROJECT_SOURCE_DIR}/src/targets/qwen3_6/export
+  ${PROJECT_SOURCE_DIR}/src/targets/qwen3_6/impl)
+find_package(Threads REQUIRED)
+target_link_libraries(ninfer_qwen3_6_incremental_encode_test PRIVATE Threads::Threads)
 ninfer_add_test(ninfer_qwen3_6_runtime_mechanisms_test
   SOURCES targets/qwen3_6/test_runtime_mechanisms.cpp
   LIBRARIES ninfer_engine ninfer_core)
@@ -411,14 +420,18 @@ foreach(test_target IN LISTS ninfer_qwen3_6_27b_internal_tests)
     ${PROJECT_SOURCE_DIR}/src/targets/qwen3_6/export)
 endforeach()
 
-# Windows/MSVC: BEX64 (STATUS_STACK_BUFFER_OVERRUN 0xC0000409, /GS cookie check) en este
-# test = artefacto del binario de test (MSVC /O2 + /GS). El motor v1.0.7 en la 5090 con el
-# artifact prod (nvfp4dflash2 23.7 GB) arranca y sirve SIN BEX (smoke :8091, 2026-09-09:
-# completion visible, finish=stop); en Linux/Clang (upstream) el test pasa.
-# Se excluye solo en Windows. (softmax_attention_test, el otro BEX64 del port 4090,
-# PASA en la 5090 — 113 s green, 2026-09-09 — y se mantiene activo.)
+# Windows/MSVC: BEX64 (STATUS_STACK_BUFFER_OVERRUN 0xC0000409, /GS cookie check) en estos
+# binarios de test = artefacto del binario (MSVC /O2 + /GS): crash de arranque, CERO output
+# (ni el cerr previo a los asserts), antes de la logica del test. El motor v1.0.7/v1.0.8 en
+# la 5090 con el artifact prod (nvfp4dflash2 23.7 GB) arranca y sirve SIN BEX (smoke :8091,
+# 2026-09-09: completion visible, finish=stop); en Linux/Clang (upstream) los tests pasan.
+# Se excluyen solo en Windows. Verificado 2026-09-09 (campana v1.0.8): frontend_test
+# (v1.0.7) y incremental_encode_test (v1.0.8) devuelven el mismo 0xC0000409 sin output en
+# ambos arboles 4090/5090. (softmax_attention_test, el otro BEX64 del port 4090, PASA en
+# la 5090 — 100.9 s green en la suite v1.0.8, 2026-09-09 — y se mantiene activo.)
 if(WIN32)
   set_tests_properties(ninfer_qwen3_6_frontend_test
+                      ninfer_qwen3_6_incremental_encode_test
     PROPERTIES DISABLED true
     DISABLE_REASON "BEX64 0xC0000409 en binario de test (MSVC); motor OK con datos reales (smoke :8091, 2026-09-09)")
 endif()

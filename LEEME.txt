@@ -1,13 +1,17 @@
 ================================================================
- NInfer 5090 Windows - v1.0.7 (pre-compiled portable build)
- NInfer 5090 Windows - v1.0.7 (build portable precompilada)
+ NInfer 5090 Windows - v1.0.8 (pre-compiled portable build)
+ NInfer 5090 Windows - v1.0.8 (build portable precompilada)
 ================================================================
 
 WHAT THIS IS / QUE ES
   Native Windows 11 build of NInfer (https://github.com/Neroued/ninfer)
   for NVIDIA GeForce RTX 5090 (sm_120a), synced to upstream v1.0.7
   (commit b88c0f6f): DFlash2, NVFP4, FP8 KV, WDDM evictable-budget
-  bypass. Apache License 2.0.
+  bypass, plus the two v1.0.8 frontend fork ports (--tolerant-tool-calls,
+  incremental host encode). The other three v1.0.8 ports are sm_89-only
+  (4090 branch), so v1.0.8 here is frontend-only. Apache License 2.0.
+  A/B vs the v1.0.7 binaries (same day, same hardware): pure parity on
+  all nine serve-level points (+/-1 %).
 
 CONTENTS / CONTENIDO
   ninfer-serve.exe    server binary / binario del servidor

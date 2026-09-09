@@ -2,7 +2,7 @@
 
 > Windows port of NInfer for the NVIDIA GeForce RTX 5090 (`sm_120a`, Blackwell). Selected checkpoints. Maximum single-GPU inference performance. **100% Native Windows MSVC (no WSL2 required).**
 
-**[⬇️ Descargar versión precompilada portable v1.0.7 (Windows 11) en GitHub Releases](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.7-windows/ninfer-5090-windows-v1.0.7.zip)**
+**[⬇️ Descargar versión precompilada portable v1.0.8 (Windows 11) en GitHub Releases](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.8-windows/ninfer-5090-windows-v1.0.8.zip)**
 
 > 🖥️ **Companion repository (RTX 4090):** [Ambolio/ninfer-4090-windows](https://github.com/Ambolio/ninfer-4090-windows) — the Ada Lovelace (`sm_89`) sibling branch. Both repos publish the full two-card benchmark tables: see [Benchmarks — v1.0.7 cross-GPU campaign (2026-09-09)](#benchmarks--v107-cross-gpu-campaign-2026-09-09).
 
@@ -31,6 +31,8 @@ gratitude to all of them — in lineage order:
 | **natpate** | [natpate/ninfer-windows](https://github.com/natpate/ninfer-windows) | Base Win32/MSVC portability layer, unbuffered asynchronous I/O (`OVERLAPPED`), initial Windows scripts |
 | **headpiece747** | [headpiece747/ninfer-5090-windows](https://github.com/headpiece747/ninfer-5090-windows) | **Original RTX 5090 Windows fork**: native MSVC build, C-runtime patches, FFmpeg integration |
 | **Don-Chad** | [Don-Chad/ninfer-3090](https://github.com/Don-Chad/ninfer-3090) | Pioneering Ampere work and early compatibility bridges |
+| **dylanbrodiefafard** | [dylanbrodiefafard/ninfer](https://github.com/dylanbrodiefafard/ninfer) | v1.0.8 port: incremental host encode (`48d1857`) |
+| **nmorgowicz** | [nmorgowicz/ninfer-windows](https://github.com/nmorgowicz/ninfer-windows) | v1.0.8 port: `--tolerant-tool-calls` (`69b0950`) |
 
 Model foundations: **Qwen Team (Alibaba Cloud)** for the foundational model
 architectures, **unsloth** for the NVFP4 quantizations, and **z-lab** for the
@@ -41,11 +43,29 @@ full legal attribution (Apache-2.0 §4) and third-party details.
 
 ---
 
-## Relationship to Upstream (v1.0.7)
+## Relationship to Upstream (v1.0.8)
 
 This branch tracks upstream `b88c0f6f` (v1.0.7: 7 commits post-v1.0.6 —
 MoE pipeline/prefetch/L2 ×3, NVFP4 W4A4 TMA, open-addressed BPE table,
-unicode NFC-skip, host-arena fix) on top of the v1.0.6 sync at `a16b6442`.
+unicode NFC-skip, host-arena fix) on top of the v1.0.6 sync at `a16b6442`,
+and — new in v1.0.8 — the two frontend ports from the NInfer fork ecosystem
+(2026-09-09 forkscan, A/B'd against the v1.0.7 binaries on this card before
+the deploy; see [Benchmarks — v1.0.7 cross-GPU campaign](#benchmarks--v107-cross-gpu-campaign-2026-09-09),
+subsection "v1.0.8 A/B on this baseline"):
+
+- **`--tolerant-tool-calls`** (nmorgowicz `69b0950`): opt-in serve flag that
+  keeps a complete Qwen tool call even when trailing wrapper garbage follows
+  (off by default; the strict parser keeps its all-or-nothing behavior).
+- **Incremental host encode** (dylanbrodiefafard `48d1857`): LRU cache of
+  committed history prefixes with loop-position splicing — unchanged
+  history is re-encoded incrementally instead of from scratch.
+
+The three remaining v1.0.8 ports (GDN gating pairwise-K, T=1
+double-buffered Ada MMA, SM-count CTA sizing) are sm_89-only kernel work on
+the 4090 sibling branch — they do not apply to `sm_120a` — so v1.0.8 on
+this card is frontend-only, and the A/B against v1.0.7 is pure parity
+(confirmed: all nine serve-level points within ±1 %).
+
 The engine core is shared 1:1 with upstream —
 the Windows layer (MSVC build, WDDM bypass) does not touch the compute path,
 which is why the numbers in this README land on top of the upstream published
@@ -63,7 +83,7 @@ RTX 5090 numbers (see [Comparison with the upstream repository](#comparison-with
 ### Added by this fork
 
 - **Native Windows 11 compilation**: CMake + MSVC 2022 + Ninja + CUDA 13.x —
-  no WSL2, no virtualization overhead (`build_windows.bat`, `build_v1.0.7.bat`).
+  no WSL2, no virtualization overhead (`build_windows.bat`, `build_v1.0.8.bat`).
 - **WDDM bypass (`--wddm-evictable-budget`)**: D3D12/DXGI residency lock that
   budgets runtime memory against total VRAM instead of the WDDM process
   budget (see
@@ -72,6 +92,16 @@ RTX 5090 numbers (see [Comparison with the upstream repository](#comparison-with
   [UDPSendToFailed/ninfer-4090](https://github.com/UDPSendToFailed/ninfer-4090).
 - Windows C-runtime patches (random generation, thread-safe time, `/FS`),
   automated dependency management, and FFmpeg integration for Vision.
+
+### Verified in v1.0.8 (this branch)
+
+- **v1.0.8 test suite on Windows (2026-09-09)**: 105/105 executed green +
+  2 excluded on Windows (BEX64 0xC0000409 in the MSVC test binaries —
+  `frontend_test`, the pre-existing v1.0.7 artifact, and
+  `incremental_encode_test`, the new port's test with the same
+  zero-output-at-startup signature; a test-binary artifact, not the engine:
+  the v1.0.8 server with the production NVFP4-DFlash2 artifact boots and
+  serves clean, verified with a production-artifact smoke).
 
 ---
 
@@ -380,6 +410,36 @@ measured delta is the overhead of the Windows port (WDDM), nothing else.
   verified clean with a production-artifact smoke). pytest 75/3/1 (same
   path-separator artifact).
 
+### v1.0.8 A/B on this baseline (2026-09-09)
+
+v1.0.8 = v1.0.7 + the five fork ports listed in
+[Relationship to Upstream](#relationship-to-upstream-v108) (the three
+sm_89 kernel ports apply to the 4090; the two frontend ports apply to both
+cards). Same machine, same day, same like-for-like protocol as the campaign
+above, A/B'd against the v1.0.7 binaries before the v1.0.8 deploy:
+
+| Point (steady decode tok/s; P0 = NIAH 262,144 makespan in s, lower = better) | 4090 v1.0.7 | 4090 v1.0.8 | 5090 v1.0.7 | 5090 v1.0.8 |
+|---|---:|---:|---:|---:|
+| S3 35B C1 (int8 auto) | 459.5 | 459.0 | 672.9 | 671.9 |
+| S3 35B C2 (int8 auto) | 660.7 | **680.2** | 974.3 | 972.5 |
+| S3 35B C4 (int8 auto) | 914.3 | 918.4 | 1,336.4 | 1,334.4 |
+| S3 35B C8 (4090: prod shape `rk4v4-e8` 131,072 · 5090: int8 auto) | 1,095.5 | 1,099.0 | 1,544.5 | 1,530.7 |
+| P0 35B NIAH makespan (s) | 393.91 | 394.82 | 355.28 | 355.83 |
+| NS 27B C1 (4090 `groupwise-int` / 5090 `nvfp4`; see the NS caveats) | 108.5 | 108.5 | 148.1 | 147.7 |
+| NS 27B C2 | 164.6 | 159.2 ¹ | 281.2 | 280.0 |
+| NS 27B C4 | 185.9 | 183.6 | 491.8 | 495.4 |
+| NS 27B C8 | 290.5 | 289.8 | 827.5 | 830.9 |
+
+**Verdict: no regression on any point (±1 %).** The 35B gains +3 % at C=2
+on the 4090, the production shape (C8 `rk4v4-e8`) is stable, and the 5090
+is pure parity — its v1.0.8 delta is frontend-only, which is exactly the
+expected result.
+
+¹ borderline noise band on the 4090 27B reference point (morning v1.0.7
+baseline vs evening v1.0.8; the 27B runs on the 4090 only as a standby
+reference, not production; the 27B matrix decode stayed flat at
+−0.1…−0.9 % on the same day).
+
 ---
 
 ## Running the server
@@ -469,7 +529,7 @@ Also verified on this branch (measured above). Model artifacts: **Neroued**
 
 ## Installation (Pre-compiled)
 
-**Download the [ninfer-5090-windows-v1.0.7.zip](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.7-windows/ninfer-5090-windows-v1.0.7.zip) from the [v1.0.7-windows release](https://github.com/Ambolio/ninfer-5090-windows/releases/tag/v1.0.7-windows).**
+**Download the [ninfer-5090-windows-v1.0.8.zip](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.8-windows/ninfer-5090-windows-v1.0.8.zip) from the [v1.0.8-windows release](https://github.com/Ambolio/ninfer-5090-windows/releases/tag/v1.0.8-windows).**
 
 The ZIP contains `ninfer-serve.exe` with its runtime DLLs (FFmpeg), a generic
 `start_5090.bat`, a `download_model.bat`, and a `LEEME.txt` with instructions
@@ -489,11 +549,13 @@ and model links.
 ### 1. Build Automatically
 
 ```cmd
-build_windows.bat
+build_v1.0.8.bat
 ```
 
-*(The script automatically downloads the required FFmpeg dev package,
-locates your MSVC environment, and builds with Ninja.)*
+Self-contained: sm_120a, vision, Release. Needs this tree + MSVC BuildTools +
+CUDA 13.3 + Ninja. Pass an alternative build directory as the first argument.
+(`build_windows.bat` remains as the interactive variant that also downloads
+the FFmpeg dev package.)
 
 ### 2. Manual CMake Build
 
