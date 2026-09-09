@@ -172,7 +172,8 @@ not the port:
 | 27B NVFP4 prefill ~7.7k tok (INT8 g64 KV) | 8,340.4 tok/s | 8,754 tok/s (12.8k tok, FP8 KV) | **105 %** |
 | 27B NVFP4 MTP3 decode C1 | 143.8 tok/s (48.9 % accept) | 144.9 tok/s (42.4 % accept) | **101 %** |
 | 27B g64 prefill ~7.7k tok (INT8 g64 KV) | 3,274.7 tok/s | 3,515 tok/s (12.8k tok, FP8 KV) | **107 %** |
-| 27B g64 MTP3 decode (structured output) | 224.4 tok/s | 149.3 tok/s (free generation, 42.2 % accept) | 67 % |
+| 27B g64 MTP3 decode (structured output) | 224.4 tok/s (89.5 % accept) | 237.6 tok/s (structured, 87.5 % accept) | **106 %** |
+| 27B NVFP4 MTP3 decode (structured output) | 219.8 tok/s (90.8 % accept) | 233.8 tok/s (structured, 89.5 % accept) | **106 %** |
 
 Caveats:
 
@@ -182,10 +183,14 @@ Caveats:
 2. **Decode acceptance** is prompt-content-dependent: the upstream C1
    27B-nvfp4 row (48.9%) and our free-generation row (42.4%) use different
    prompt content; the committed-tokens rate is identical (144.9 vs 143.8).
-3. **Scenario mismatch on the g64 decode row**: upstream's 224.4 tok/s is a
-   *structured-output* MTP3 point (structured outputs draft-accept far
-   better); our 149.3 tok/s is free-form generation. Not like-for-like — the
-   67% ratio understates parity.
+3. **Structured decode rows are now like-for-like**: we measured the same
+   structured-output MTP3 point upstream publishes (g64 = 224.4 tok/s, NVFP4
+   = 219.8 tok/s; 15-request corpus = 3 structured scenarios × 5 fixed
+   seeds) on this build. Both quantizations land at **106 %** of upstream —
+   the earlier free-generation 149.3 tok/s row (42.2 % accept) is no longer
+   the comparison basis. Structured outputs draft-accept far better than
+   free generation (~90 % vs ~42 %), which is why the like-for-like ratio
+   is parity even though the two scenarios are so different.
 4. **Upstream 260k-prefill points** (2,203.1 / 1,609.7 tok/s): we did not
    run a 260k prefill on the 5090; the closest measured point is the 56.4k
    prefill in the table above.
@@ -347,6 +352,13 @@ measured delta is the overhead of the Windows port (WDDM), nothing else.
   upstream published for the same card, across every point of this campaign:
   S3 steady 104.7–111.9 % of upstream, NS steady 103.0–107.9 %, P0 prefill
   100.3–105.6 %, P0 decode 105.9–107.6 %, N0 prefill 105.9–117.3 %.
+- **RTX 5090 — structured MTP3 decode (follow-up, same day).** The upstream
+  "Structured" single-stream point, re-measured like-for-like on this build
+  (same 15-request corpus = 3 structured scenarios × 5 fixed seeds, same
+  server flags): g64 **237.6 ± 16.8 tok/s @ 87.5 %** vs upstream
+  224.4 ± 13.6 @ 89.5 % → **106 %**; NVFP4 **233.8 ± 10.8 @ 89.5 %** vs
+  219.8 ± 8.6 @ 90.8 % → **106 %** (see "Comparison with the upstream
+  repository" above).
 - **RTX 4090 — 38–79 % of the upstream *5090* reference** (S3 71.5–79.3 %,
   NS 37.9–75.4 % — with the quantization caveat above —, P0 63.5–93.9 %):
   that is the Ada-vs-Blackwell hardware gap, not port overhead. Within the
