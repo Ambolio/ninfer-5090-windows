@@ -1,6 +1,6 @@
 @echo off
 rem ============================================================
-rem NInfer v1.0.6 - RTX 5090 (sm_120a) - generic startup.
+rem NInfer v1.0.7 - RTX 5090 (sm_120a) - generic startup.
 rem
 rem Model file expected next to this script:
 rem   qwen3_8_27b_nvfp4.ninfer   (see download_model.bat)

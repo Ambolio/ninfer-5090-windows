@@ -1,12 +1,12 @@
 @echo off
 rem ============================================================
-rem NInfer v1.0.6 (upstream a16b6442) - RTX 5090 (sm_120a), vision.
+rem NInfer v1.0.7 (upstream b88c0f6f) - RTX 5090 (sm_120a), vision.
 rem Autocontenido: solo necesita este arbol + MSVC BuildTools +
 rem CUDA 13.3 + Ninja (los tres ya instalados; rutas en el script).
 rem
 rem Uso:
-rem   build_v1.0.6.bat              -> build en _build_5090new (relativo al arbol)
-rem   build_v1.0.6.bat <build_dir>  -> build en el directorio indicado
+rem   build_v1.0.7.bat              -> build en _build_5090new (relativo al arbol)
+rem   build_v1.0.7.bat <build_dir>  -> build en el directorio indicado
 rem Sin "pause": apto para correr en background y redirigir log.
 rem ============================================================
 setlocal

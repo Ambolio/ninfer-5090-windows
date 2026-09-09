@@ -1,12 +1,12 @@
 ================================================================
- NInfer 5090 Windows - v1.0.6 (pre-compiled portable build)
- NInfer 5090 Windows - v1.0.6 (build portable precompilada)
+ NInfer 5090 Windows - v1.0.7 (pre-compiled portable build)
+ NInfer 5090 Windows - v1.0.7 (build portable precompilada)
 ================================================================
 
 WHAT THIS IS / QUE ES
   Native Windows 11 build of NInfer (https://github.com/Neroued/ninfer)
-  for NVIDIA GeForce RTX 5090 (sm_120a), synced to upstream v1.0.6
-  (commit a16b6442): DFlash2, NVFP4, FP8 KV, WDDM evictable-budget
+  for NVIDIA GeForce RTX 5090 (sm_120a), synced to upstream v1.0.7
+  (commit b88c0f6f): DFlash2, NVFP4, FP8 KV, WDDM evictable-budget
   bypass. Apache License 2.0.
 
 CONTENTS / CONTENIDO
@@ -55,8 +55,8 @@ MEASURED WITH THIS BUILD (RTX 5090, single stream, 2026-09-08,
   27B g64    FP8 KV DFlash2 C=2 131k : prefill 3.50k tok/s (12.8k tok),
                                       decode 130.2 tok/s (26.1% of 7 tok)
   Full table (VRAM, KV pool, TTFT, startup) + comparison vs upstream
-  published 5090 numbers and vs the windows-4090 branch: README.md of
-  the windows-5090 branch.
+  published 5090 numbers and vs the 4090 sibling repository: README.md
+  of this repository.
 
 NOTES / NOTAS
   - start_5090.bat uses MTP3 with the public NVFP4 artifact (Neroued:
@@ -64,7 +64,7 @@ NOTES / NOTAS
     DFlash2 profile (--spec dflash2 --draft-tokens 7) needs the merged
     companion artifact qwen3_8_27b_nvfp4dflash2.ninfer (the same public
     NVFP4 weights + DFlash companion, upstream converter pipeline; not
-    yet published in Neroued's public HF repos as of 2026-09-08).
+    yet published in Neroued's public HF repos as of 2026-09-09).
   - Long-context DFlash2: use --max-context 200000 --kv-capacity auto.
     With the 23.7 GB NVFP4-dflash2 artifact, --max-context 230000
     fails at startup (~120 MB short of the engine reservation after the
@@ -91,7 +91,7 @@ DISCLAIMER / DESCARGO DE RESPONSABILIDAD
   run this software at your own responsibility.
 
 SOURCES / FUENTES
-  https://github.com/Ambolio/ninfer-windows  (branch windows-5090)
+  https://github.com/Ambolio/ninfer-5090-windows  (branch main)
   Model: https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer
 
 CREDITS
@@ -99,4 +99,4 @@ CREDITS
   rk4v4-e8) - sergiuszm (sm_89 kernels) - natpate (Win32 base) -
   headpiece747 (5090 Windows fork) - Don-Chad (Ampere pioneer) -
   Qwen Team - unsloth (NVFP4) - z-lab (DFlash2 companion weights).
-  Full legal attribution: NOTICE in the windows-5090 branch.
+  Full legal attribution: NOTICE in this repository.

@@ -2,7 +2,7 @@
 
 > Windows port of NInfer for the NVIDIA GeForce RTX 5090 (`sm_120a`, Blackwell). Selected checkpoints. Maximum single-GPU inference performance. **100% Native Windows MSVC (no WSL2 required).**
 
-**[⬇️ Descargar versión precompilada portable v1.0.6 (Windows 11) en GitHub Releases](https://github.com/Ambolio/ninfer-windows/releases/download/v1.0.6-windows/ninfer-5090-windows-v1.0.6.zip)**
+**[⬇️ Descargar versión precompilada portable v1.0.7 (Windows 11) en GitHub Releases](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.7-windows/ninfer-5090-windows-v1.0.7.zip)**
 
 NInfer 5090 Windows is a native Windows 11 port of the upstream
 [Neroued/ninfer](https://github.com/Neroued/ninfer) C++20/CUDA inference
@@ -39,11 +39,12 @@ full legal attribution (Apache-2.0 §4) and third-party details.
 
 ---
 
-## Relationship to Upstream (v1.0.6)
+## Relationship to Upstream (v1.0.7)
 
-This branch tracks upstream `a16b6442` (v1.0.6 sync, 88 commits: DFlash2
-backend, small-T sparse-MoE decode, w8 vocabulary t64 route,
-speculative-settlement fixes). The engine core is shared 1:1 with upstream —
+This branch tracks upstream `b88c0f6f` (v1.0.7: 7 commits post-v1.0.6 —
+MoE pipeline/prefetch/L2 ×3, NVFP4 W4A4 TMA, open-addressed BPE table,
+unicode NFC-skip, host-arena fix) on top of the v1.0.6 sync at `a16b6442`.
+The engine core is shared 1:1 with upstream —
 the Windows layer (MSVC build, WDDM bypass) does not touch the compute path,
 which is why the numbers in this README land on top of the upstream published
 RTX 5090 numbers (see [Comparison with the upstream repository](#comparison-with-the-upstream-repository)).
@@ -60,7 +61,7 @@ RTX 5090 numbers (see [Comparison with the upstream repository](#comparison-with
 ### Added by this fork
 
 - **Native Windows 11 compilation**: CMake + MSVC 2022 + Ninja + CUDA 13.x —
-  no WSL2, no virtualization overhead (`build_windows.bat`, `build_v1.0.6.bat`).
+  no WSL2, no virtualization overhead (`build_windows.bat`, `build_v1.0.7.bat`).
 - **WDDM bypass (`--wddm-evictable-budget`)**: D3D12/DXGI residency lock that
   budgets runtime memory against total VRAM instead of the WDDM process
   budget (see
@@ -149,7 +150,7 @@ Reading the table:
   artifacts used above are public. The two DFlash2 artifacts
   (`qwen3_8_27b_nvfp4dflash2.ninfer`, `qwen3_8_27b_dflash2.ninfer`) are the
   same public base weights with the DFlash companion merged in via the
-  upstream converter pipeline; as of 2026-09-08 the merged artifacts are not
+  upstream converter pipeline; as of 2026-09-09 the merged artifacts are not
   yet published in Neroued's public HuggingFace repos (verified across all of
   his public NInfer repos).
 
@@ -216,11 +217,12 @@ CUDA Graphs, a 1,024-token prefill chunk, and five fixed seeds after warm-up.
 | Qwen3.8-27B `groupwise-int` | 3,274.7 tok/s | 1,609.7 tok/s | 224.4 tok/s |
 | Qwen3.8-27B `nvfp4` | 8,340.4 tok/s | 2,203.1 tok/s | 219.8 tok/s |
 
-### Cross-card: this 5090 vs the 4090 branch of this repository
+### Cross-card: this 5090 vs the 4090 sibling repository
 
-The `windows-4090` branch of this repository publishes its own fully measured
-RTX 4090 table (sm_89, `rk4v4-e8` KV). For the two artifacts present on both
-cards (same artifacts, same harness, different card + KV dtype):
+The sibling repository [Ambolio/ninfer-4090-windows](https://github.com/Ambolio/ninfer-4090-windows)
+publishes its own fully measured RTX 4090 table (sm_89, `rk4v4-e8` KV). For
+the two artifacts present on both cards (same artifacts, same harness,
+different card + KV dtype):
 
 | Artifact / profile (single stream) | 4090 (`rk4v4-e8` KV, measured) | 5090 (FP8 KV, measured) | 5090 / 4090 |
 |---|---:|---:|---:|
@@ -304,8 +306,8 @@ Also verified on this branch (measured above). Model artifacts: **Neroued**
 | Model | Artifact | Download |
 |---|---|---|
 | Qwen3.8-27B | `qwen3_8_27b.ninfer` (groupwise-int, FP8 KV, MTP3) | [Qwen3.8-27B-NInfer](https://huggingface.co/neroued/Qwen3.8-27B-NInfer) |
-| Qwen3.8-27B DFlash2 (NVFP4) | `qwen3_8_27b_nvfp4dflash2.ninfer` (dflash2, 7 drafts) | the public NVFP4 artifact above + DFlash companion, merged with the upstream converter pipeline; the merged artifact is not yet on Neroued's public HF (2026-09-08) |
-| Qwen3.8-27B DFlash2 (g64) | `qwen3_8_27b_dflash2.ninfer` (dflash2, 7 drafts) | the public g64 artifact above + DFlash companion, merged with the upstream converter pipeline; the merged artifact is not yet on Neroued's public HF (2026-09-08) |
+| Qwen3.8-27B DFlash2 (NVFP4) | `qwen3_8_27b_nvfp4dflash2.ninfer` (dflash2, 7 drafts) | the public NVFP4 artifact above + DFlash companion, merged with the upstream converter pipeline; the merged artifact is not yet on Neroued's public HF (2026-09-09) |
+| Qwen3.8-27B DFlash2 (g64) | `qwen3_8_27b_dflash2.ninfer` (dflash2, 7 drafts) | the public g64 artifact above + DFlash companion, merged with the upstream converter pipeline; the merged artifact is not yet on Neroued's public HF (2026-09-09) |
 
 ---
 
@@ -321,7 +323,7 @@ Also verified on this branch (measured above). Model artifacts: **Neroued**
 
 ## Installation (Pre-compiled)
 
-**Download the [ninfer-5090-windows-v1.0.6.zip](https://github.com/Ambolio/ninfer-windows/releases/download/v1.0.6-windows/ninfer-5090-windows-v1.0.6.zip) from the [v1.0.6-windows release](https://github.com/Ambolio/ninfer-windows/releases/tag/v1.0.6-windows).**
+**Download the [ninfer-5090-windows-v1.0.7.zip](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.7-windows/ninfer-5090-windows-v1.0.7.zip) from the [v1.0.7-windows release](https://github.com/Ambolio/ninfer-5090-windows/releases/tag/v1.0.7-windows).**
 
 The ZIP contains `ninfer-serve.exe` with its runtime DLLs (FFmpeg), a generic
 `start_5090.bat`, a `download_model.bat`, and a `LEEME.txt` with instructions
