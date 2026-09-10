@@ -3,7 +3,43 @@
 
 #include <spdlog/logger.h>
 
+#if defined(_WIN32)
+// MSVC has no <unistd.h>; the stderr capture below uses the CRT file-descriptor
+// equivalents. The capture pipe is binary and stderr is put in binary mode for the
+// capture (restored to its default text mode on exit): the assertions compare the
+// log text exactly. _getmode no longer exists in modern UCRT, so the default
+// _O_TEXT is restored explicitly.
+#include <fcntl.h>
+#include <io.h>
+#include <process.h>
+#include <stdio.h>
+
+namespace {
+
+inline int capture_pipe(int fd[2]) { return _pipe(fd, 0, _O_BINARY); }
+inline int capture_dup(int fd) { return _dup(fd); }
+inline int capture_dup2(int from, int to) { return _dup2(from, to); }
+inline int capture_close(int fd) { return _close(fd); }
+inline int capture_read(int fd, void* buffer, unsigned int count) { return _read(fd, buffer, count); }
+
+const int kStderrFd = _fileno(stderr);
+
+} // namespace
+#else
 #include <unistd.h>
+
+namespace {
+
+inline int capture_pipe(int fd[2]) { return ::pipe(fd); }
+inline int capture_dup(int fd) { return ::dup(fd); }
+inline int capture_dup2(int from, int to) { return ::dup2(from, to); }
+inline int capture_close(int fd) { return ::close(fd); }
+inline int capture_read(int fd, void* buffer, std::size_t count) { return ::read(fd, buffer, count); }
+
+constexpr int kStderrFd = STDERR_FILENO;
+
+} // namespace
+#endif
 
 #include <algorithm>
 #include <array>
@@ -20,41 +56,50 @@ namespace {
 class StderrCapture {
 public:
     StderrCapture() {
-        if (::pipe(pipe_) != 0) { throw std::runtime_error(std::strerror(errno)); }
-        saved_ = ::dup(STDERR_FILENO);
-        if (saved_ < 0 || ::dup2(pipe_[1], STDERR_FILENO) < 0) {
+#if defined(_WIN32)
+        (void)_setmode(kStderrFd, _O_BINARY);
+#endif
+        if (capture_pipe(pipe_) != 0) { throw std::runtime_error(std::strerror(errno)); }
+        saved_ = capture_dup(kStderrFd);
+        if (saved_ < 0 || capture_dup2(pipe_[1], kStderrFd) < 0) {
             throw std::runtime_error(std::strerror(errno));
         }
-        ::close(pipe_[1]);
+        capture_close(pipe_[1]);
         pipe_[1] = -1;
     }
 
     ~StderrCapture() {
         if (saved_ >= 0) {
-            (void)::dup2(saved_, STDERR_FILENO);
-            ::close(saved_);
+            (void)capture_dup2(saved_, kStderrFd);
+            capture_close(saved_);
         }
-        if (pipe_[0] >= 0) { ::close(pipe_[0]); }
+        if (pipe_[0] >= 0) { capture_close(pipe_[0]); }
+#if defined(_WIN32)
+        (void)_setmode(kStderrFd, _O_TEXT);
+#endif
     }
 
     std::string finish() {
         std::fflush(stderr);
-        if (::dup2(saved_, STDERR_FILENO) < 0) { throw std::runtime_error(std::strerror(errno)); }
-        ::close(saved_);
+        if (capture_dup2(saved_, kStderrFd) < 0) {
+            throw std::runtime_error(std::strerror(errno));
+        }
+        capture_close(saved_);
         saved_ = -1;
 
         std::string output;
         std::array<char, 4096> buffer{};
         for (;;) {
-            const ssize_t count = ::read(pipe_[0], buffer.data(), buffer.size());
-            if (count == 0) { break; }
-            if (count < 0) {
-                if (errno == EINTR) { continue; }
-                throw std::runtime_error(std::strerror(errno));
+            const int count =
+                capture_read(pipe_[0], buffer.data(), static_cast<unsigned int>(buffer.size()));
+            if (count <= 0) {
+                if (count < 0 && errno == EINTR) { continue; }
+                if (count < 0) { throw std::runtime_error(std::strerror(errno)); }
+                break;
             }
             output.append(buffer.data(), static_cast<std::size_t>(count));
         }
-        ::close(pipe_[0]);
+        capture_close(pipe_[0]);
         pipe_[0] = -1;
         return output;
     }

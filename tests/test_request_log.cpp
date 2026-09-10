@@ -13,7 +13,13 @@
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
+// MSVC has no <unistd.h>; the only POSIX symbol this test uses is ::getpid().
+#include <process.h>
+#define getpid _getpid
+#else
 #include <unistd.h>
+#endif
 
 namespace {
 

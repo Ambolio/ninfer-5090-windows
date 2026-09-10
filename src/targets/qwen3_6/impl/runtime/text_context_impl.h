@@ -71,6 +71,24 @@ void require_tensor_shape(const Tensor& t, DType dtype, std::initializer_list<st
     if (t.data == nullptr) { throw std::invalid_argument(std::string(label) + " data is null"); }
 }
 
+// Batched verify packs sequences as [rows, width*batch] and traverses every column-independent
+// projection once over the aggregate T=width*batch. NVFP4 W4A4 routes are selected from that
+// aggregate T, so a C>1 round can cross a W4A4 threshold the C=1 (T=width) round does not. The
+// family hands the C=1 width to the leaves that own T-dependent routes so the target package
+// can pin the C=1 quantization family at the aggregate launch.
+// Guard: the C=1-family pin only ever *acts* (i.e. differs from routing by the
+// aggregate T) for widths below the largest pinned W4A4 threshold (residual = 8
+// in the NVFP4 27B variant). For those widths it DOWNGRADES the C>1 family:
+// mtp3 (verify width k+1 = 4 < 8) lost its W4A4 residual route in packed
+// verify and measured C4 −12 % / C8 −31 % in the v1.0.9 WVS A/B (27B NS mtp3,
+// v1.0.8 494.8/827.7 → v1.0.9 434.3/570.7 tok/s). For width >= 8 the pin is a
+// mathematical no-op (every C=1 route is already W4A4), so restricting it to
+// width >= 8 disables the harmful cases (mtp k+1 <= 4, dflash2 T5-T7) while
+// keeping the plumbing inert-but-present for wider future specs.
+std::int32_t packed_route_tokens(std::int32_t batch, std::int32_t width) {
+    return (batch > 1 && width >= 8) ? width : 0;
+}
+
 void require_tensor_window(const Tensor& t, DType dtype, std::int32_t rows, std::int32_t cols,
                            const char* label) {
     if (cols <= 0) { throw std::invalid_argument(std::string(label) + " cols must be positive"); }
@@ -833,8 +851,10 @@ void TextContext::attn_mix(const FullLayerW& w, Tensor& x, int fidx, Phase ph) {
     Tensor gate_flat = gate.view({kCfg.q_size, T});
     Tensor k_flat    = k.view({kCfg.kv_size, T});
     Tensor v_flat    = v.view({kCfg.kv_size, T});
-    Variant::attention_projection(h, *w.projection, q_flat, gate_flat, k_flat, v_flat, ph, work_,
-                                  s);
+    const std::int32_t route_tokens =
+        packed_route_tokens(active_sequence_batch_, active_sequence_width_);
+    Variant::attention_projection(h, *w.projection, q_flat, gate_flat, k_flat, v_flat, ph, work_, s,
+                                  route_tokens);
 
     const auto results = workspace_recipe::text_attention_results<TextConfig>(work_, T);
     Tensor qn          = results.normalized_query.view({kCfg.head_dim, kCfg.n_q, T});
@@ -874,7 +894,8 @@ void TextContext::attn_mix(const FullLayerW& w, Tensor& x, int fidx, Phase ph) {
     }
     ops::sigmoid_mul(gate, a, s);
 
-    Variant::attention_output_projection(a.view({kCfg.q_size, T}), *w.o_proj, x, ph, work_, s);
+    Variant::attention_output_projection(a.view({kCfg.q_size, T}), *w.o_proj, x, ph, work_, s,
+                                         route_tokens);
 }
 
 void TextContext::gdn_mix(const GdnLayerW& w, Tensor& x, int gidx, Phase ph) {
@@ -982,7 +1003,9 @@ void TextContext::gdn_mix(const GdnLayerW& w, Tensor& x, int gidx, Phase ph) {
         {kCfg.gdn_v_dim, kCfg.gdn_v_heads, T});
     ops::gated_rmsnorm(o, *w.gdn_norm, z, kCfg.rms_eps, on, s);
 
-    Variant::gdn_output_projection(on.view({kCfg.value_dim, T}), *w.out_proj, x, ph, work_, s);
+    Variant::gdn_output_projection(on.view({kCfg.value_dim, T}), *w.out_proj, x, ph, work_, s,
+                                   packed_route_tokens(active_sequence_batch_,
+                                                       active_sequence_width_));
 }
 
 ops::SparseMoeHints TextContext::next_projection_hints(int layer) const {
@@ -1005,7 +1028,8 @@ void TextContext::mlp_tail(const Tensor* post_norm, const MlpW& m, Tensor& x, Ph
     Tensor h       = workspace_recipe::post_mixer_hidden<TextConfig>(work_, T);
     ops::rmsnorm(x, *post_norm, kCfg.rms_eps, true, h, s);
 
-    Variant::post_mixer(h, *m.payload, x, ph, hints, work_, s);
+    Variant::post_mixer(h, *m.payload, x, ph, hints, work_, s,
+                        packed_route_tokens(active_sequence_batch_, active_sequence_width_));
 }
 
 template <class Tap>

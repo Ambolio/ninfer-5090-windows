@@ -2,7 +2,7 @@
 
 > Windows port of NInfer for the NVIDIA GeForce RTX 5090 (`sm_120a`, Blackwell). Selected checkpoints. Maximum single-GPU inference performance. **100% Native Windows MSVC (no WSL2 required).**
 
-**[⬇️ Descargar versión precompilada portable v1.0.8 (Windows 11) en GitHub Releases](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.8-windows/ninfer-5090-windows-v1.0.8.zip)**
+**[⬇️ Descargar versión precompilada portable v1.0.9 (Windows 11) en GitHub Releases](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.9-windows/ninfer-5090-windows-v1.0.9.zip)**
 
 > 🖥️ **Companion repository (RTX 4090):** [Ambolio/ninfer-4090-windows](https://github.com/Ambolio/ninfer-4090-windows) — the Ada Lovelace (`sm_89`) sibling branch. Both repos publish the full two-card benchmark tables: see [Benchmarks — v1.0.7 cross-GPU campaign (2026-09-09)](#benchmarks--v107-cross-gpu-campaign-2026-09-09).
 
@@ -83,7 +83,7 @@ RTX 5090 numbers (see [Comparison with the upstream repository](#comparison-with
 ### Added by this fork
 
 - **Native Windows 11 compilation**: CMake + MSVC 2022 + Ninja + CUDA 13.x —
-  no WSL2, no virtualization overhead (`build_windows.bat`, `build_v1.0.8.bat`).
+  no WSL2, no virtualization overhead (`build_windows.bat`, `build_v1.0.9.bat`).
 - **WDDM bypass (`--wddm-evictable-budget`)**: D3D12/DXGI residency lock that
   budgets runtime memory against total VRAM instead of the WDDM process
   budget (see
@@ -102,6 +102,50 @@ RTX 5090 numbers (see [Comparison with the upstream repository](#comparison-with
   zero-output-at-startup signature; a test-binary artifact, not the engine:
   the v1.0.8 server with the production NVFP4-DFlash2 artifact boots and
   serves clean, verified with a production-artifact smoke).
+
+### v1.0.9 (2026-09-10)
+
+v1.0.9 is a correctness-and-verification release on the same v1.0.8 baseline
+(no new fork ports; the forkscan item-4 remainder that applied to this card):
+
+- **`make_prefill_work` saturation fix** (port-correctness): the Windows port
+  replaced upstream's `unsigned __int128` clamp (saturating) with direct
+  64-bit products (wrapping). The wrap is unobservable in production — it
+  needs ≥ 2^64 tokens; the largest real context is 262,144 — but it was
+  caught by the ported test (`ninfer_context_cost_test` at U64_MAX inputs).
+  The fix restores an exact portable saturation (overflow-checked division +
+  factored triangular count), verified against arbitrary-precision arithmetic
+  on 20,022 random cases.
+- **Three Windows test ports**: `test_context_cost`, `test_pretty_logging`,
+  and `test_request_log` now compile and run on MSVC (POSIX `unistd.h`
+  shims — `_getpid`, `dup`/`close` plumbing — the C1083 exclusion was a
+  suite artifact, not a test limitation).
+- **Packed-verify C=1 NVFP4 route pin** (forkscan item 4, L1): in packed
+  verify (C>1) all requests launch at once with aggregate
+  T = width × batch, and the NVFP4 W4A4 kernel family is selected from that
+  T. The pin hands the C=1 width to the leaves so the single aggregate
+  launch uses the C=1 family. **Latent by design on this card**: the first
+  A/B (width = verify width, unguarded) regressed MTP3 — verify width k+1 = 4
+  is below the residual W4A4 threshold (8), so the pin downgraded the
+  residual route from W4A4 to A16 (C4 −12 %, C8 −31 %). The guard
+  (`width >= 8`) makes the pin inert for MTP (width ≤ 4) and DFlash2 T5–T7
+  (width 7) and a mathematical no-op for T8+; with the guard, the A/B is
+  pure parity (below).
+
+### Verified in v1.0.9 (this branch)
+
+- **v1.0.9 test suite on Windows (2026-09-09/10)**: 108/108 executed green
+  (105 v1.0.8 + the 3 newly ported tests) + 2 excluded on Windows (the same
+  BEX64 0xC0000409 test-binary artifact) + 2 skipped by-design — 4 runs
+  (r1–r4) after the `make_prefill_work` fix, all 0 failures.
+- **Canaries (75 greedy DFlash2 runs + production-artifact smoke)**:
+  gate green — AIME 65,536 at 203–210 tok/s with draft-accept 37–39 % long /
+  79–96 % short (consistent with v1.0.8); smoke on the production
+  NVFP4-DFlash2 artifact served clean (DFlash2 accepted 51/77 = 66.2 %).
+- **A/B v1.0.8 vs v1.0.9 (same machine, same session, like-for-like)**:
+  pure parity on the 27B points (±1 %); the 35B package is all-A16, where
+  the pin is a no-op guaranteed in code (A/B r1: S3 ±1 %, P0 +0.01 s).
+  See [Benchmarks](#benchmarks) — subsection "v1.0.9 A/B on this baseline".
 
 ---
 
@@ -440,6 +484,39 @@ baseline vs evening v1.0.8; the 27B runs on the 4090 only as a standby
 reference, not production; the 27B matrix decode stayed flat at
 −0.1…−0.9 % on the same day).
 
+### v1.0.9 A/B on this baseline (2026-09-10)
+
+v1.0.9 = v1.0.8 + the delta described in
+[v1.0.9 (2026-09-10)](#v109-2026-09-10). Same machine, same dedicated
+session, like-for-like protocol (16k context / 8192 decode, int8 KV,
+C1/C2/C4/C8 decode-saturation + P0 NIAH 262,144 makespan).
+
+The **first A/B** ran the pin unguarded and exposed the MTP3 regression
+above (C4 −12.2 %, C8 −31.1 %; mechanism: residual route W4A4→A16 at
+verify width 4 < threshold 8; the DFlash2 C2 "+2.8 %" was run-to-run
+variance — opposite sign to the mechanism, and both arms measured ≈319 in
+the re-run). The guard (`width >= 8`) was added and the A/B re-run:
+
+| Point (steady decode tok/s; v1.0.8 → v1.0.9) | C1 | C2 | C4 | C8 |
+|---|---:|---:|---:|---:|
+| 27B NS MTP3 (nvfp4, 16k/8192, int8) | 148.1 → 148.1 (0.0 %) | 281.2 → 281.2 (0.0 %) | 496.8 → 492.7 (−0.8 %) | 829.0 → 828.2 (−0.1 %) |
+| 27B ND DFlash2-7 (prod artifact, 16k/8192, int8) | 169.8 → 169.8 (0.0 %) | 319.5 → 319.2 (−0.1 %) | 545.9 → 541.9 (−0.7 %) | 929.8 → 923.0 (−0.7 %) |
+| 35B S3 MTP3 (groupwise-int; A/B r1, no re-run needed) | 672.2 → 672.7 | 971.7 → 971.5 | 1,320.5 → 1,333.1 | 1,541.6 → 1,530.7 |
+| 35B P0 NIAH makespan (s, lower = better; A/B r1) | 355.60 → 355.61 | | | |
+
+**Verdict: pure parity (±1 %) with the guard — no regression.** The 35B
+package is all-A16, so the pin is a no-op guaranteed in code (its A/B r1
+rows are within ±1 % / +0.01 s and were not re-run).
+
+**Honest bottom line: no net performance gain in v1.0.9.** The main item-4
+effect — the single-pass aggregate launch in packed verify — already landed
+with the v1.0.7 sync, which is why v1.0.8 already measured 1.89× at C2/C1
+(between dylan's 1.36× and 2.10×). What the pin contributes on top is the
+C=1-family route selection, which does not help this card's shapes (it
+regresses MTP3 and is noise on DFlash2), so it ships guarded and latent.
+The release's value is correctness (the saturation fix, the three test
+ports, the verification record) — not speed.
+
 ---
 
 ## Running the server
@@ -529,7 +606,7 @@ Also verified on this branch (measured above). Model artifacts: **Neroued**
 
 ## Installation (Pre-compiled)
 
-**Download the [ninfer-5090-windows-v1.0.8.zip](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.8-windows/ninfer-5090-windows-v1.0.8.zip) from the [v1.0.8-windows release](https://github.com/Ambolio/ninfer-5090-windows/releases/tag/v1.0.8-windows).**
+**Download the [ninfer-5090-windows-v1.0.9.zip](https://github.com/Ambolio/ninfer-5090-windows/releases/download/v1.0.9-windows/ninfer-5090-windows-v1.0.9.zip) from the [v1.0.9-windows release](https://github.com/Ambolio/ninfer-5090-windows/releases/tag/v1.0.9-windows).**
 
 The ZIP contains `ninfer-serve.exe` with its runtime DLLs (FFmpeg), a generic
 `start_5090.bat`, a `download_model.bat`, and a `LEEME.txt` with instructions
@@ -549,7 +626,7 @@ and model links.
 ### 1. Build Automatically
 
 ```cmd
-build_v1.0.8.bat
+build_v1.0.9.bat
 ```
 
 Self-contained: sm_120a, vision, Release. Needs this tree + MSVC BuildTools +

@@ -1,6 +1,6 @@
 ================================================================
- NInfer 5090 Windows - v1.0.8 (pre-compiled portable build)
- NInfer 5090 Windows - v1.0.8 (build portable precompilada)
+ NInfer 5090 Windows - v1.0.9 (pre-compiled portable build)
+ NInfer 5090 Windows - v1.0.9 (build portable precompilada)
 ================================================================
 
 WHAT THIS IS / QUE ES
@@ -12,6 +12,13 @@ WHAT THIS IS / QUE ES
   (4090 branch), so v1.0.8 here is frontend-only. Apache License 2.0.
   A/B vs the v1.0.7 binaries (same day, same hardware): pure parity on
   all nine serve-level points (+/-1 %).
+
+  v1.0.9 (2026-09-10) adds: a port-correctness fix (make_prefill_work
+  128-bit saturation, latent since the v1.0.7 Windows port —
+  unobservable below 2^64 tokens), three Windows test fixes, and the
+  packed-verify C=1 NVFP4 route pin (latent by design: guarded to
+  verify widths >= 8, where it is a no-op). A/B vs the v1.0.8
+  binaries: pure parity (+/-1 %) — no net performance change.
 
 CONTENTS / CONTENIDO
   ninfer-serve.exe    server binary / binario del servidor

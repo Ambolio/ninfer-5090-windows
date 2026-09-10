@@ -244,10 +244,19 @@ struct PrefillWork {
     result.tokens                       = suffix_tokens;
     result.vision_items                 = vision_items;
     result.vision_patches               = vision_patches;
-        const std::uint64_t suffix      = suffix_tokens;
-    const std::uint64_t linear      = static_cast<std::uint64_t>(prefix_tokens) * suffix;
-    const std::uint64_t triangular  = suffix * (suffix + 1U) / 2U;
+    const std::uint64_t suffix      = suffix_tokens;
     constexpr std::uint64_t maximum = ~(std::uint64_t)0;
+    // Upstream computes both products in unsigned __int128 and clamps the sum to 64 bits.
+    // MSVC has no __int128, so each term is clamped at the 64-bit maximum instead — exact
+    // for the clamped result, because clamping a summand above the maximum cannot lower the
+    // clamped sum. (The direct 64-bit products wrapped here: U64_MAX inputs yielded 1.)
+    const std::uint64_t linear =
+        prefix_tokens != 0 && suffix > maximum / prefix_tokens ? maximum
+                                                               : prefix_tokens * suffix;
+    const std::uint64_t factor1 = (suffix % 2U == 0U) ? suffix / 2U : suffix;
+    const std::uint64_t factor2 = (suffix % 2U == 0U) ? suffix + 1U : suffix / 2U + 1U;
+    const std::uint64_t triangular =
+        factor1 != 0 && factor2 > maximum / factor1 ? maximum : factor1 * factor2;
     const std::uint64_t attention =
         triangular > maximum - linear ? maximum : linear + triangular;
     result.attention_pairs = attention;
